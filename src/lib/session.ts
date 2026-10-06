@@ -1,5 +1,6 @@
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
+import { db } from "./db";
 import type { UserInfo } from "./ldap";
 
 const SESSION_COOKIE = "ad_session";
@@ -55,12 +56,29 @@ export async function getSession(): Promise<SessionUser | null> {
     return null;
   }
 
+  let sessionUser: SessionUser | undefined;
   try {
     const { payload } = await jwtVerify(token, getSecretKey());
-    return (payload.user as SessionUser) ?? null;
+    sessionUser = payload.user as SessionUser | undefined;
   } catch {
     return null;
   }
+  if (!sessionUser) {
+    return null;
+  }
+
+  // The token only proves identity. Role and status are read fresh from the
+  // database so an admin's change applies on the user's next request instead
+  // of at their next login; a removed or disabled user loses the session.
+  const dbUser = await db.user.findUnique({
+    where: { id: sessionUser.userId },
+    select: { role: true, status: true },
+  });
+  if (!dbUser || dbUser.status !== "ACTIVE") {
+    return null;
+  }
+
+  return { ...sessionUser, role: dbUser.role };
 }
 
 export async function destroySession(): Promise<void> {

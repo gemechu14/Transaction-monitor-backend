@@ -56,12 +56,9 @@ export async function proxy(request: NextRequest) {
   }
 
   try {
-    const { payload } = await jwtVerify(token, new TextEncoder().encode(secret));
-    const user = payload.user as { role?: string } | undefined;
-
-    if (isAdminApi && user?.role !== "ADMIN") {
-      return withCors(request, NextResponse.json({ error: "Forbidden" }, { status: 403 }));
-    }
+    // Only checks the token is valid. The role inside it is frozen at login, so the
+    // admin check is left to requireAdmin() in each route, which reads the current role.
+    await jwtVerify(token, new TextEncoder().encode(secret));
 
     return withCors(request, NextResponse.next());
   } catch {
