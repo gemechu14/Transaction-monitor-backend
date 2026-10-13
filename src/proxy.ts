@@ -4,14 +4,6 @@ import { jwtVerify } from "jose";
 
 const SESSION_COOKIE = "ad_session";
 
-// Comma-separated list of exact frontend origins allowed to call this API
-// with credentials, e.g. "http://localhost:3000,https://tm.coopbankoromiasc.com".
-// Credentialed requests can't use a wildcard origin, so unlisted origins get no CORS headers at all.
-const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? "")
-  .split(",")
-  .map((origin) => origin.trim())
-  .filter(Boolean);
-
 const corsHeaders = {
   "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
@@ -19,8 +11,10 @@ const corsHeaders = {
 };
 
 function withCors(request: NextRequest, response: NextResponse) {
+  // All origins are allowed. Credentialed requests can't use a wildcard "*",
+  // so the request's own origin is echoed back instead.
   const origin = request.headers.get("origin");
-  if (!origin || !allowedOrigins.includes(origin)) {
+  if (!origin) {
     return response;
   }
 

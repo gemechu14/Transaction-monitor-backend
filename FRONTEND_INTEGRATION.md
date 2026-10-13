@@ -4,7 +4,7 @@ This backend is a headless JSON API (Next.js API routes, no pages). It has no UI
 
 ## CORS
 
-If the frontend runs on a different origin (different port counts as different origin — e.g. frontend on `:3000`, this API on `:3001`), the frontend's exact origin must be added to `ALLOWED_ORIGINS` (comma-separated) in this backend's env, enforced in `src/proxy.ts`. Wildcard (`*`) origins don't work here because the requests carry cookies (`credentials: "include"`) — an origin not in the list gets no CORS headers at all and the browser blocks the response, even though `curl`/Postman (which ignore CORS) work fine. Tell whoever owns this backend the frontend's origin(s) (dev and prod) so they can be added.
+If the frontend runs on a different origin (different port counts as different origin — e.g. frontend on `:3000`, this API on `:3001`), no backend config is needed: `src/proxy.ts` allows every origin by echoing the request's `Origin` back in `Access-Control-Allow-Origin` (a literal `*` can't be used because the requests carry cookies via `credentials: "include"`).
 
 If the frontend is instead served from the same origin (e.g. proxied behind the same domain/reverse proxy, or via the frontend's own server-side rewrite to this backend), this doesn't apply — no CORS needed for same-origin requests.
 

@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { rootCertificates } from "node:tls";
 import { Client } from "ldapts";
 
 export interface UserInfo {
@@ -89,6 +91,10 @@ function createClient(
         rejectUnauthorized:
           process.env.LDAP_TLS_REJECT_UNAUTHORIZED !== "false",
         ...(tlsServername && { servername: tlsServername }),
+        // Internal CA that signed the DC certificate (PEM), added on top of Node's defaults.
+        ...(process.env.LDAP_CA_CERT_PATH && {
+          ca: [...rootCertificates, readFileSync(process.env.LDAP_CA_CERT_PATH, "utf8")],
+        }),
       },
     }),
   });
