@@ -113,6 +113,84 @@ Returns `{ "user": {...} }` or `404` if the id doesn't exist.
 #### `DELETE /api/admin/users/:id`
 **Soft-delete** — sets `status: "DISABLED"`, does not remove the row (preserves audit history). A disabled user is blocked at the login gate regardless of AD credentials. Returns `{ "user": {...} }` or `404`.
 
+### Dashboard endpoints — live WSO2 data, any logged-in user
+
+The backend calls WSO2 Micro Integrator (`WSO2_BASE_URL`) server-side. **Never call WSO2 from the browser**: send these requests to this backend with `credentials: "include"`, like the auth calls. If the frontend proxies `/api/auth/*` through its own server, proxy `/api/dashboard/*` the same way.
+
+Every response uses the same envelope: `{ "success": true, "message": "...", "data": {...} }` or `{ "success": false, "message": "...", "error": { "code": <status>, "details": "..." } }`. Show `error.details` to the user.
+
+#### `GET /api/dashboard/total-transaction?startDate=&endDate=&source=`
+
+| Param | Required | Format |
+|---|---|---|
+| `startDate` | yes | `YYYY-MM-DD`, inclusive |
+| `endDate` | yes | `YYYY-MM-DD`, inclusive, on or after `startDate` |
+| `source` | yes | `tas`, `ips_incoming`, `ips_push`, `coopapp`, `jica`, `eeu`, `souflle`, `hajj`, or `all` |
+
+Single source, `200`:
+```json
+{
+  "success": true,
+  "message": "Total transactions fetched successfully",
+  "data": { "source": "eeu", "startDate": "2026-10-01", "endDate": "2026-10-12", "totalTransactions": 5457, "totalAmount": 17252980.08 }
+}
+```
+
+`source=all`, `200`: the backend adds up the 8 sources itself, because WSO2's own `all` currently returns 0. `bySource` lists each source's figures. A source WSO2 fails for has `"ok": false`, is **left out of the totals**, and appears in `failedSources`. When `failedSources` is not empty, show a warning that the totals are partial.
+```json
+{
+  "success": true,
+  "message": "Total transactions fetched successfully",
+  "data": {
+    "source": "all", "startDate": "2026-10-01", "endDate": "2026-10-12",
+    "totalTransactions": 99630, "totalAmount": 1105900331.14,
+    "bySource": [
+      { "source": "tas", "ok": false, "status": 502, "message": "WSO2 returned an invalid response" },
+      { "source": "ips_incoming", "ok": true, "totalTransactions": 89375, "totalAmount": 936246837.59 }
+    ],
+    "failedSources": ["tas"]
+  }
+}
+```
+
+Errors:
+| Status | Meaning |
+|---|---|
+| 400 | Missing or invalid `startDate`/`endDate`/`source`, or `startDate` after `endDate` |
+| 401 | Not logged in. This comes from this backend's session, never from WSO2 |
+| 502 | WSO2 failed or sent an invalid response (for `all`: every source failed) |
+| 504 | WSO2 didn't respond within `WSO2_TIMEOUT_MS` (default 15s) |
+
+#### `GET /api/dashboard/all-advanced?startDate=&endDate=&source=all`
+
+Every source's totals in one call (relays WSO2 `/wso2Dashboard/allAdvanced`). `startDate`/`endDate` follow the same rules as above. `source` is optional and ignored: the response always lists every source.
+
+`200`, with `data` keyed by WSO2's source names. Counts are integers and amounts are rounded to 2 decimals. Keys are passed through as WSO2 sends them, so a new WSO2 source appears without a backend change.
+```json
+{
+  "success": true,
+  "message": "Total transactions fetched successfully",
+  "data": {
+    "tas": { "totalTransactions": 0, "totalAmount": 0 },
+    "ips_incoming": { "totalTransactions": 113154, "totalAmount": 1177387842.43 },
+    "ips_push": { "totalTransactions": 5314, "totalAmount": 162780363.37 },
+    "coopapp": { "totalTransactions": 47, "totalAmount": 94897 },
+    "jica": { "totalTransactions": 221, "totalAmount": 1504060.85 },
+    "eeu": { "totalTransactions": 6477, "totalAmount": 30476989.77 },
+    "souflle": { "totalTransactions": 28, "totalAmount": 21333019.69 },
+    "hajj": { "totalTransactions": 0, "totalAmount": 0 },
+    "telebirrToBank": { "totalTransactions": 80961, "totalAmount": 991879983.96 },
+    "bankToTelebirr": { "totalTransactions": 10492, "totalAmount": 765697798.12 },
+    "coopremitOtherBank": { "totalTransactions": 0, "totalAmount": 0 },
+    "terapayOtherBank": { "totalTransactions": 673, "totalAmount": 19232779.45 }
+  }
+}
+```
+
+There's no "all" total in the response; add the sources up on the client. WSO2 gives no per-source status here, so **a `0` can mean either no transactions or a failed lookup**. `tas` is always `0` in this API even though `total-transaction?source=tas` fails.
+
+Errors: same statuses and envelope as `total-transaction` (400 / 401 / 502 / 504).
+
 ## Roles & statuses
 
 - `role`: `ADMIN` (can manage users) | `USER`
