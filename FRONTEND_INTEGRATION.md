@@ -163,7 +163,7 @@ Errors:
 
 #### `GET /api/dashboard/all-advanced?startDate=&endDate=&source=all`
 
-Every source's totals in one call (relays WSO2 `/wso2Dashboard/allAdvanced`). `startDate`/`endDate` follow the same rules as above. `source` is optional and ignored: the response always lists every source.
+Every source's totals in one call (relays WSO2 `/wso2DashboardAPI/allAdvanced`). `startDate`/`endDate` follow the same rules as above. `source` is optional and ignored: the response always lists every source.
 
 `200`, with `data` keyed by WSO2's source names. Counts are integers and amounts are rounded to 2 decimals. Keys are passed through as WSO2 sends them, so a new WSO2 source appears without a backend change.
 ```json
@@ -188,6 +188,26 @@ Every source's totals in one call (relays WSO2 `/wso2Dashboard/allAdvanced`). `s
 ```
 
 There's no "all" total in the response; add the sources up on the client. WSO2 gives no per-source status here, so **a `0` can mean either no transactions or a failed lookup**. `tas` is always `0` in this API even though `total-transaction?source=tas` fails.
+
+Errors: same statuses and envelope as `total-transaction` (400 / 401 / 502 / 504).
+
+#### `GET /api/dashboard/daily-transaction?startDate=&endDate=&source=all`
+
+Day-by-day totals (relays WSO2 `/wso2DashboardAPI/dailyTransaction`). `startDate`/`endDate` follow the same rules as above. `source` is optional, defaults to `all`, and accepts the same values as `total-transaction` plus `telebirrToBank`, `bankToTelebirr`, `coopremitOtherBank` and `terapayOtherBank` (case-insensitive).
+
+`200`, with `data` keyed by date (`YYYY-MM-DD`), oldest first. Counts are integers and amounts are rounded to 2 decimals.
+```json
+{
+  "success": true,
+  "message": "Daily transactions fetched successfully",
+  "data": {
+    "2026-10-14": { "totalTransactions": 22373, "totalAmount": 261653445.14 },
+    "2026-10-15": { "totalTransactions": 23162, "totalAmount": 464528132.71 }
+  }
+}
+```
+
+WSO2 may leave out days with no data, so fill missing dates with `0` on the client when charting.
 
 Errors: same statuses and envelope as `total-transaction` (400 / 401 / 502 / 504).
 

@@ -13,6 +13,9 @@ function handleError(e: unknown) {
   if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2025") {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
+  if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+    return NextResponse.json({ error: "User already exists" }, { status: 409 });
+  }
   console.error(e);
   return NextResponse.json({ error: "Internal error" }, { status: 500 });
 }
@@ -36,7 +39,12 @@ export async function PATCH(req: Request, { params }: RouteContext) {
     await requireAdmin();
     const { id } = await params;
     const body = await req.json();
-    const data: { role?: "ADMIN" | "USER"; status?: "ACTIVE" | "DISABLED" } = {};
+    const data: { email?: string; role?: "ADMIN" | "USER"; status?: "ACTIVE" | "DISABLED" } = {};
+    if (body.email !== undefined) {
+      const email = String(body.email).trim().toLowerCase();
+      if (!email) return NextResponse.json({ error: "Email is required" }, { status: 400 });
+      data.email = email;
+    }
     if (body.role === "ADMIN" || body.role === "USER") data.role = body.role;
     if (body.status === "ACTIVE" || body.status === "DISABLED") data.status = body.status;
 

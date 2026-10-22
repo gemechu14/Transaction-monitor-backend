@@ -16,6 +16,27 @@ export function isWso2Source(value: string): value is Wso2Source {
   return value === "all" || (WSO2_CHANNEL_SOURCES as readonly string[]).includes(value);
 }
 
+/**
+ * Sources WSO2's dailyTransaction also accepts, on top of the channel sources.
+ * Kept apart so total-transaction's `all` (summed from WSO2_CHANNEL_SOURCES) is unchanged.
+ */
+const WSO2_DAILY_EXTRA_SOURCES = [
+  "telebirrToBank",
+  "bankToTelebirr",
+  "coopremitOtherBank",
+  "terapayOtherBank",
+] as const;
+
+export type Wso2DailySource = Wso2Source | (typeof WSO2_DAILY_EXTRA_SOURCES)[number];
+
+const DAILY_SOURCES: readonly Wso2DailySource[] = ["all", ...WSO2_CHANNEL_SOURCES, ...WSO2_DAILY_EXTRA_SOURCES];
+
+/** Matches `value` case-insensitively and returns WSO2's spelling (`telebirrToBank`), or undefined. */
+export function toWso2DailySource(value: string): Wso2DailySource | undefined {
+  const lower = value.toLowerCase();
+  return DAILY_SOURCES.find((s) => s.toLowerCase() === lower);
+}
+
 export interface TransactionTotals {
   totalTransactions: number;
   totalAmount: number;
@@ -134,7 +155,7 @@ export async function fetchSourceTotals(
   endDate: string,
 ): Promise<SourceTotalsResult> {
   const label = `totalTransaction source=${source}`;
-  const result = await callWso2("/wso2Dashboard/totalTransaction", { startDate, endDate, source }, label);
+  const result = await callWso2("/wso2DashboardAPI/totalTransaction", { startDate, endDate, source }, label);
   if (!result.ok) {
     return { source, ok: false, status: result.status, message: result.message };
   }
@@ -188,7 +209,7 @@ export type AllAdvancedResult =
  * WSO2 ignores `source` here and always lists every source.
  */
 export async function fetchAllAdvanced(startDate: string, endDate: string): Promise<AllAdvancedResult> {
-  const result = await callWso2("/wso2Dashboard/allAdvanced", { startDate, endDate, source: "all" }, "allAdvanced");
+  const result = await callWso2("/wso2DashboardAPI/allAdvanced", { startDate, endDate, source: "all" }, "allAdvanced");
   if (!result.ok) return result;
 
   const raw = result.data;
@@ -205,6 +226,42 @@ export async function fetchAllAdvanced(startDate: string, endDate: string): Prom
       return { ok: false, status: 502, message: `WSO2 returned invalid totals for ${source}` };
     }
     data[source] = totals;
+  }
+  return { ok: true, data };
+}
+
+export type DailyTransactionResult =
+  | { ok: true; data: Record<string, TransactionTotals> }
+  | { ok: false; status: number; message: string };
+
+/**
+ * Totals per day for one source or `all`, keyed by date (`YYYY-MM-DD`) in
+ * ascending order. WSO2 may leave out days with no data; those are left for
+ * the client to fill.
+ */
+export async function fetchDailyTransaction(
+  source: Wso2DailySource,
+  startDate: string,
+  endDate: string,
+): Promise<DailyTransactionResult> {
+  const label = `dailyTransaction source=${source}`;
+  const result = await callWso2("/wso2DashboardAPI/dailyTransaction", { startDate, endDate, source }, label);
+  if (!result.ok) return result;
+
+  const raw = result.data;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    console.error(`WSO2 returned no data (${label}): ${result.text.slice(0, 300)}`);
+    return { ok: false, status: 502, message: "WSO2 returned an invalid response" };
+  }
+
+  const data: Record<string, TransactionTotals> = {};
+  for (const [date, value] of Object.entries(raw).sort(([a], [b]) => a.localeCompare(b))) {
+    const totals = parseTotals(value);
+    if (!totals) {
+      console.error(`WSO2 returned invalid totals (${label}, date=${date}): ${JSON.stringify(value)}`);
+      return { ok: false, status: 502, message: `WSO2 returned invalid totals for ${date}` };
+    }
+    data[date] = totals;
   }
   return { ok: true, data };
 }

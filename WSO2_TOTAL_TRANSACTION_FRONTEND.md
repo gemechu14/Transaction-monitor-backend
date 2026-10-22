@@ -5,7 +5,7 @@ Live transaction count and amount per payment source, from WSO2 Micro Integrator
 **The frontend never calls WSO2 directly.** It calls the TM backend, and the backend calls WSO2 server-side. That keeps WSO2 off the public internet, avoids CORS problems, and works around bugs in the WSO2 API (see the end of this doc).
 
 ```
-Browser  ──►  TM backend  /api/dashboard/total-transaction  ──►  WSO2  https://wso2mi.coopbankoromiasc.com/wso2Dashboard/totalTransaction
+Browser  ──►  TM backend  /api/dashboard/total-transaction  ──►  WSO2  https://wso2mi.coopbankoromiasc.com/wso2DashboardAPI/totalTransaction
 ```
 
 ---
