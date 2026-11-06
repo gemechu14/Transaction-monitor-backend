@@ -113,6 +113,25 @@ Returns `{ "user": {...} }` or `404` if the id doesn't exist.
 #### `DELETE /api/admin/users/:id`
 **Soft-delete** — sets `status: "DISABLED"`, does not remove the row (preserves audit history). A disabled user is blocked at the login gate regardless of AD credentials. Returns `{ "user": {...} }` or `404`.
 
+### Channel details — description and owner per dashboard channel
+
+#### `GET /api/channels` — any logged-in user
+Returns every channel that has saved details (channels never edited are left out, so the frontend falls back to its built-in description):
+```json
+{ "channels": [
+  { "source": "ips", "description": "Instant payments to and from other banks",
+    "ownerName": "Abebe Kebede", "ownerEmail": "abebe.k@coopbankoromiasc.com",
+    "updatedAt": "2026-11-06T09:00:00.000Z", "updatedBy": "admin@coopbankoromiasc.com" }
+] }
+```
+
+#### `PATCH /api/admin/channels/:source` — admin only
+`:source` is the frontend's channel id (letters, digits, `_`). Creates the row on first save. Send only the fields to change; `""` or `null` clears one:
+```json
+{ "description": "…", "ownerName": "Abebe Kebede", "ownerEmail": "abebe.k@coopbankoromiasc.com" }
+```
+Limits: description 300, owner name 120, owner email 254 characters, and the email must look valid. Returns `{ "channel": {...} }`, or `400 {"error": "..."}`.
+
 ### Dashboard endpoints — live WSO2 data, any logged-in user
 
 The backend calls WSO2 Micro Integrator (`WSO2_BASE_URL`) server-side. **Never call WSO2 from the browser**: send these requests to this backend with `credentials: "include"`, like the auth calls. If the frontend proxies `/api/auth/*` through its own server, proxy `/api/dashboard/*` the same way.

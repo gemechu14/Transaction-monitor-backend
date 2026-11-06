@@ -29,3 +29,13 @@ enum Status {
   ACTIVE
   DISABLED
 }
+
+/// Admin-edited details for one dashboard channel, keyed by its source id (e.g. "ips").
+model ChannelInfo {
+  source      String   @id
+  description String?
+  ownerName   String?
+  ownerEmail  String?
+  updatedAt   DateTime @updatedAt
+  updatedBy   String?
+}
