@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { toChannelResponse } from "@/lib/channel-info";
 import { db } from "@/lib/db";
 import { getSession } from "@/lib/session";
 
@@ -11,5 +12,5 @@ export async function GET() {
   }
 
   const channels = await db.channelInfo.findMany({ orderBy: { source: "asc" } });
-  return NextResponse.json({ channels });
+  return NextResponse.json({ channels: channels.map(toChannelResponse) });
 }

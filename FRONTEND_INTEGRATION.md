@@ -113,24 +113,39 @@ Returns `{ "user": {...} }` or `404` if the id doesn't exist.
 #### `DELETE /api/admin/users/:id`
 **Soft-delete** — sets `status: "DISABLED"`, does not remove the row (preserves audit history). A disabled user is blocked at the login gate regardless of AD credentials. Returns `{ "user": {...} }` or `404`.
 
-### Channel details — description and owner per dashboard channel
+### Channel details — description, owner and type per dashboard channel
 
 #### `GET /api/channels` — any logged-in user
-Returns every channel that has saved details (channels never edited are left out, so the frontend falls back to its built-in description):
+Returns every channel that has saved details (channels never edited are left out, so the frontend falls back to its built-in description). `channelType` and `activeMonths` are always present, `null` when not set:
 ```json
 { "channels": [
-  { "source": "ips", "description": "Instant payments to and from other banks",
+  { "source": "hajj", "description": "Hajj pilgrimage payments",
     "ownerName": "Abebe Kebede", "ownerEmail": "abebe.k@coopbankoromiasc.com",
-    "updatedAt": "2026-11-06T09:00:00.000Z", "updatedBy": "admin@coopbankoromiasc.com" }
+    "channelType": "seasonal", "activeMonths": [5, 6, 7],
+    "updatedAt": "2026-11-20T09:15:00.000Z", "updatedBy": "admin@coopbankoromiasc.com" }
 ] }
 ```
+
+| Field | Values |
+|---|---|
+| `channelType` | `normal` (real-time), `nightly` (one overnight batch), `monthly`, `yearly`, `seasonal`, or `null` (read as `normal`) |
+| `activeMonths` | Months `1`–`12`, sorted, for `seasonal` channels; `null` for every other type |
 
 #### `PATCH /api/admin/channels/:source` — admin only
 `:source` is the frontend's channel id (letters, digits, `_`). Creates the row on first save. Send only the fields to change; `""` or `null` clears one:
 ```json
-{ "description": "…", "ownerName": "Abebe Kebede", "ownerEmail": "abebe.k@coopbankoromiasc.com" }
+{ "description": "…", "ownerName": "Abebe Kebede", "ownerEmail": "abebe.k@coopbankoromiasc.com",
+  "channelType": "seasonal", "activeMonths": [5, 6, 7] }
 ```
-Limits: description 300, owner name 120, owner email 254 characters, and the email must look valid. Returns `{ "channel": {...} }`, or `400 {"error": "..."}`.
+Limits: description 300, owner name 120, owner email 254 characters, and the email must look valid.
+
+Type and months are checked after merging the request with the saved row, so a description-only PATCH on a seasonal channel stays valid:
+- `channelType` must be one of the five values, or `null`.
+- `activeMonths` must be `null` or a list of whole numbers 1–12 (at most 12). It's stored de-duplicated and sorted (`[7, 5, 5]` → `[5, 7]`).
+- A `seasonal` channel needs at least one month: `"Pick at least one month for a seasonal channel."`
+- Any other type stores no months, even if some are sent, and changing a seasonal channel to another type clears its months.
+
+Returns `{ "channel": {...} }` (same shape as GET), or `400 {"error": "..."}` with a message to show the user.
 
 ### Dashboard endpoints — live WSO2 data, any logged-in user
 

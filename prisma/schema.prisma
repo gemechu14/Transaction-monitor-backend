@@ -32,10 +32,22 @@ enum Status {
 
 /// Admin-edited details for one dashboard channel, keyed by its source id (e.g. "ips").
 model ChannelInfo {
-  source      String   @id
-  description String?
-  ownerName   String?
-  ownerEmail  String?
-  updatedAt   DateTime @updatedAt
-  updatedBy   String?
+  source       String       @id
+  description  String?
+  ownerName    String?
+  ownerEmail   String?
+  /// null reads as "normal" (real-time).
+  channelType  ChannelType?
+  /// Months 1–12, sorted; only kept for seasonal channels. Empty is returned as null.
+  activeMonths Int[]        @default([])
+  updatedAt    DateTime     @updatedAt
+  updatedBy    String?
+}
+
+enum ChannelType {
+  normal
+  nightly
+  monthly
+  yearly
+  seasonal
 }
