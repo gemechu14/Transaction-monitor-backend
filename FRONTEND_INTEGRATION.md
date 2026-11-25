@@ -113,14 +113,17 @@ Returns `{ "user": {...} }` or `404` if the id doesn't exist.
 #### `DELETE /api/admin/users/:id`
 **Soft-delete** — sets `status: "DISABLED"`, does not remove the row (preserves audit history). A disabled user is blocked at the login gate regardless of AD credentials. Returns `{ "user": {...} }` or `404`.
 
-### Channel details — description, owner and type per dashboard channel
+### Channel details — description, owners and type per dashboard channel
 
 #### `GET /api/channels` — any logged-in user
-Returns every channel that has saved details (channels never edited are left out, so the frontend falls back to its built-in description). `channelType` and `activeMonths` are always present, `null` when not set:
+Returns every channel that has saved details (channels never edited are left out, so the frontend falls back to its built-in description). `owners` is always a list (`[]` when none); `channelType` and `activeMonths` are `null` when not set:
 ```json
 { "channels": [
   { "source": "hajj", "description": "Hajj pilgrimage payments",
-    "ownerName": "Abebe Kebede", "ownerEmail": "abebe.k@coopbankoromiasc.com",
+    "owners": [
+      { "name": "Abebe Kebede", "email": "abebe.k@coopbankoromiasc.com" },
+      { "name": "Digital Channels Team", "email": null }
+    ],
     "channelType": "seasonal", "activeMonths": [5, 6, 7],
     "updatedAt": "2026-11-20T09:15:00.000Z", "updatedBy": "admin@coopbankoromiasc.com" }
 ] }
@@ -128,16 +131,23 @@ Returns every channel that has saved details (channels never edited are left out
 
 | Field | Values |
 |---|---|
+| `owners` | Ordered list of `{ name, email }`; either may be `null`, never both |
 | `channelType` | `normal` (real-time), `nightly` (one overnight batch), `monthly`, `yearly`, `seasonal`, or `null` (read as `normal`) |
 | `activeMonths` | Months `1`–`12`, sorted, for `seasonal` channels; `null` for every other type |
 
 #### `PATCH /api/admin/channels/:source` — admin only
 `:source` is the frontend's channel id (letters, digits, `_`). Creates the row on first save. Send only the fields to change; `""` or `null` clears one:
 ```json
-{ "description": "…", "ownerName": "Abebe Kebede", "ownerEmail": "abebe.k@coopbankoromiasc.com",
+{ "description": "…",
+  "owners": [{ "name": "Abebe Kebede", "email": "abebe.k@coopbankoromiasc.com" }, { "name": "Hana T.", "email": "hana.t@coopbankoromiasc.com" }],
   "channelType": "seasonal", "activeMonths": [5, 6, 7] }
 ```
-Limits: description 300, owner name 120, owner email 254 characters, and the email must look valid.
+Limits: description 300 characters.
+
+Owners:
+- `owners` **replaces the whole list**: send every owner, in display order. `[]` or `null` removes all owners; leaving `owners` out keeps them.
+- Each owner needs a name or an email (rows with both empty are dropped). Name up to 120 characters; email up to 254, must look valid, is stored lowercase and can appear only once. At most 10 owners.
+- `ownerName` / `ownerEmail` are no longer accepted: they return `400` asking for `owners`.
 
 Type and months are checked after merging the request with the saved row, so a description-only PATCH on a seasonal channel stays valid:
 - `channelType` must be one of the five values, or `null`.

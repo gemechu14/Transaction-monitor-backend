@@ -88,17 +88,56 @@ describe("parseChannelPatch: channel type and active months", () => {
   });
 });
 
-describe("parseChannelPatch: existing fields keep their rules", () => {
-  it("trims text, clears empty values and lowercases the email", () => {
-    const data = ok(parseChannelPatch({ description: "  x  ", ownerName: "", ownerEmail: " A@B.COM " }, NONE));
-    assert.deepEqual(data, { description: "x", ownerName: null, ownerEmail: "a@b.com" });
+describe("parseChannelPatch: owners", () => {
+  it("saves several owners, trimming text and lowercasing emails", () => {
+    const data = ok(
+      parseChannelPatch(
+        { owners: [{ name: " Abebe Kebede ", email: " Abebe.K@B.COM " }, { name: "Ops team", email: null }, { email: "x@b.com" }] },
+        NONE,
+      ),
+    );
+    assert.deepEqual(data.owners, [
+      { name: "Abebe Kebede", email: "abebe.k@b.com" },
+      { name: "Ops team", email: null },
+      { name: null, email: "x@b.com" },
+    ]);
   });
 
-  it("rejects a bad body, long text and an invalid email", () => {
+  it("drops empty rows and clears the list with [] or null", () => {
+    assert.deepEqual(ok(parseChannelPatch({ owners: [{ name: "", email: " " }, { name: "A" }] }, NONE)).owners, [{ name: "A", email: null }]);
+    assert.deepEqual(ok(parseChannelPatch({ owners: [] }, NONE)).owners, []);
+    assert.deepEqual(ok(parseChannelPatch({ owners: null }, NONE)).owners, []);
+  });
+
+  it("leaves owners untouched when not sent", () => {
+    assert.equal(ok(parseChannelPatch({ description: "x" }, NONE)).owners, undefined);
+  });
+
+  it("rejects bad lists, invalid or repeated emails, long names and too many owners", () => {
+    assert.match(error(parseChannelPatch({ owners: "Abebe" }, NONE)), /owners must be a list/);
+    assert.match(error(parseChannelPatch({ owners: ["Abebe"] }, NONE)), /Owner 1 must be/);
+    assert.equal(error(parseChannelPatch({ owners: [{ name: "A" }, { email: "nope" }] }, NONE)), "Owner 2: email is not valid");
+    assert.match(error(parseChannelPatch({ owners: [{ email: "a@b.com" }, { email: "A@B.com" }] }, NONE)), /more than once/);
+    assert.match(error(parseChannelPatch({ owners: [{ name: "x".repeat(121) }] }, NONE)), /at most 120/);
+    const many = Array.from({ length: 11 }, (_, i) => ({ email: `o${i}@b.com` }));
+    assert.match(error(parseChannelPatch({ owners: many }, NONE)), /at most 10 owners/);
+  });
+
+  it("rejects the old single-owner fields with a pointer to owners", () => {
+    assert.match(error(parseChannelPatch({ ownerName: "Abebe" }, NONE)), /replaced by owners/);
+  });
+});
+
+describe("parseChannelPatch: description", () => {
+  it("trims text and clears empty values", () => {
+    assert.equal(ok(parseChannelPatch({ description: "  x  " }, NONE)).description, "x");
+    assert.equal(ok(parseChannelPatch({ description: "" }, NONE)).description, null);
+  });
+
+  it("rejects a bad body and long text", () => {
     assert.equal(error(parseChannelPatch(null, NONE)), "Invalid body");
     assert.equal(error(parseChannelPatch([], NONE)), "Invalid body");
     assert.match(error(parseChannelPatch({ description: "x".repeat(301) }, NONE)), /at most 300/);
-    assert.equal(error(parseChannelPatch({ ownerEmail: "nope" }, NONE)), "Owner email is not valid");
   });
 });
 
@@ -106,8 +145,7 @@ describe("toChannelResponse", () => {
   const row: ChannelInfo = {
     source: "ips",
     description: null,
-    ownerName: null,
-    ownerEmail: null,
+    owners: [],
     channelType: null,
     activeMonths: [],
     updatedAt: new Date("2026-11-20T09:15:00Z"),
@@ -118,6 +156,7 @@ describe("toChannelResponse", () => {
     const out = toChannelResponse(row);
     assert.equal(out.channelType, null);
     assert.equal(out.activeMonths, null);
+    assert.deepEqual(out.owners, []);
   });
 
   it("returns saved months as a list", () => {

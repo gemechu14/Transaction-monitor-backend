@@ -34,8 +34,8 @@ enum Status {
 model ChannelInfo {
   source       String       @id
   description  String?
-  ownerName    String?
-  ownerEmail   String?
+  /// Ordered list of { name, email }; at least one of the two per owner.
+  owners       Json         @default("[]")
   /// null reads as "normal" (real-time).
   channelType  ChannelType?
   /// Months 1–12, sorted; only kept for seasonal channels. Empty is returned as null.
